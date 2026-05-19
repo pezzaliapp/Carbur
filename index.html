@@ -291,19 +291,65 @@ const rad=$('#rad');
 rad.addEventListener('input',()=>{ $('#radv').textContent=rad.value+' km'; if(DB)render(); });
 
 // ---- geolocation ----
-$('#geo').addEventListener('click',()=>{
-  if(!navigator.geolocation){ status('Geolocalizzazione non supportata dal browser.'); return; }
+function isiOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+
+function geoHelp(extra){
+  var safari = isiOS();
+  var guide = safari
+    ? '<b>Come attivarla su iPhone:</b><br>'+
+      '1. Impostazioni › Privacy e sicurezza › Localizzazione → <b>attiva</b><br>'+
+      '2. Nello stesso elenco tocca <b>Safari</b> → scegli <b>"Mentre usi l\'app"</b> e attiva <b>Posizione esatta</b><br>'+
+      '3. Impostazioni › Safari › <b>Posizione</b> → imposta su <b>"Chiedi"</b><br>'+
+      '4. Torna qui, <b>ricarica la pagina</b> e tocca di nuovo Posizione'
+    : 'Controlla che il permesso di localizzazione sia consentito per questo sito nelle impostazioni del browser.';
+  return '<div class="status"><div class="big">📍</div>'+
+    '<b>'+(extra||'Non riesco ad accedere alla posizione')+'</b><br><br>'+
+    '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;max-width:340px">'+guide+'</div>'+
+    '<br><br><button class="geo" onclick="askGeo()">↻ Riprova</button></div>';
+}
+
+function askGeo(){
+  if(!navigator.geolocation){
+    view.innerHTML=geoHelp('Geolocalizzazione non supportata da questo browser');
+    return;
+  }
   $('#geo').disabled=true;
-  loading('Individuo la tua posizione…');
+  setLive('cerco posizione…');
+  loading('Individuo la tua posizione…<br><small>se Safari chiede il permesso, tocca "Consenti"</small>');
+
+  // Safari iOS a volte non chiama né success né error: timeout di sicurezza
+  var done=false;
+  var watchdog=setTimeout(function(){
+    if(done) return;
+    done=true;
+    $('#geo').disabled=false;
+    setLive('posizione bloccata');
+    view.innerHTML=geoHelp('Safari non ha risposto alla richiesta di posizione');
+  }, 15000);
+
   navigator.geolocation.getCurrentPosition(
-    p=>{ pos={lat:p.coords.latitude,lon:p.coords.longitude};
-         setLive('posizione ok'); loadData(); },
-    e=>{ $('#geo').disabled=false;
-         status('Impossibile ottenere la posizione.<br><small>'+
-           (e.code===1?'Permesso negato — abilita la localizzazione.':'Riprova all\'aperto.')+'</small>'); },
-    {enableHighAccuracy:true,timeout:12000,maximumAge:60000}
+    function(p){
+      if(done) return; done=true; clearTimeout(watchdog);
+      pos={lat:p.coords.latitude,lon:p.coords.longitude};
+      setLive('posizione ok'); loadData();
+    },
+    function(e){
+      if(done) return; done=true; clearTimeout(watchdog);
+      $('#geo').disabled=false;
+      setLive('posizione non disponibile');
+      var msg;
+      if(e.code===1) msg='Permesso di localizzazione negato';
+      else if(e.code===2) msg='Posizione non disponibile in questo momento';
+      else if(e.code===3) msg='Tempo scaduto nel rilevare la posizione';
+      else msg='Non riesco ad accedere alla posizione';
+      view.innerHTML=geoHelp(msg);
+    },
+    {enableHighAccuracy:true, timeout:14000, maximumAge:0}
   );
-});
+}
+
+$('#geo').addEventListener('click', askGeo);
 
 function setLive(t){ $('#liveline').innerHTML='<i></i>'+t; }
 function loading(t){ view.innerHTML='<div class="status"><div class="spin"></div>'+t+'</div>'; }
