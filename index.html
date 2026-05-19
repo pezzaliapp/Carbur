@@ -125,10 +125,6 @@
     color:var(--gpl);text-decoration:none}
   footer{text-align:center;font-family:ui-monospace,monospace;font-size:10px;color:var(--fade);
     margin-top:34px;line-height:1.8;letter-spacing:.3px}
-  .install{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
-    background:var(--ink);color:#000;border:none;border-radius:999px;padding:13px 24px;
-    font-family:ui-monospace,monospace;font-weight:700;font-size:13px;cursor:pointer;
-    box-shadow:0 10px 30px -8px rgba(0,0,0,.6);display:none;z-index:50}
   .ov{position:fixed;inset:0;background:rgba(6,9,14,.97);z-index:200;
     display:flex;align-items:center;justify-content:center;padding:22px;
     backdrop-filter:blur(6px);overflow-y:auto}
@@ -187,15 +183,6 @@
     </label>
     <button class="ov-btn" id="enterBtn" disabled>Entra in Carbur</button>
     <div class="ov-note">Open Data MIMIT · Lic. IODL 2.0 · nessun dato personale raccolto<br>© 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati</div>
-  </div>
-</div>
-
-<div class="ov" id="installModal" style="display:none">
-  <div class="ov-card">
-    <h2>📲 Installa Carbur</h2>
-    <div class="ov-sub" id="instOS">sul tuo dispositivo</div>
-    <div id="instBody"></div>
-    <button class="ov-x" id="instClose">Chiudi</button>
   </div>
 </div>
 
@@ -296,7 +283,7 @@
     <a href="#" id="manifOpen" style="color:var(--gas);text-decoration:none">↳ leggi il manifesto</a>
   </footer>
 </div>
-<button class="install" id="install">📲 Installa app</button>
+
 
 <script>
 const FUELS={benzina:'Benzina',gasolio:'Gasolio',gpl:'GPL',metano:'Metano'};
@@ -716,65 +703,9 @@ function isStandalone(){
 }
 
 // ---- Installa app ----
-let deferred=null;
-window.addEventListener('beforeinstallprompt',function(e){
-  e.preventDefault(); deferred=e;
-});
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
-
-(function(){
-  var btn=$('#install'), modal=$('#installModal'),
-      body=$('#instBody'), osl=$('#instOS');
-  // già installata: nascondi il pulsante
-  if(isStandalone()){ btn.style.display='none'; return; }
-
-  var p0=plat();
-  // su iPhone l'installazione è macchinosa: niente pulsante, niente istruzioni
-  if(p0==='ios'){ btn.style.display='none'; return; }
-  btn.style.display='block';
-
-  var androidSteps=
-    '<div class="ov-sec">Tocca il pulsante qui sotto: comparirà la richiesta '+
-    'di installazione di Android.</div>'+
-    '<button class="ov-btn" id="andGo">Aggiungi alla schermata Home</button>'+
-    '<div class="ov-sec" style="margin-top:16px">Se non compare nulla: apri il '+
-    'menu <b>⋮</b> di Chrome in alto a destra e scegli '+
-    '<b>"Installa app"</b> o <b>"Aggiungi a schermata Home"</b>.</div>';
-
-  var desktopSteps=
-    '<div class="ov-sec">Sul computer puoi installarla da Chrome o Edge: '+
-    'cerca l\'icona <b>installa</b> (uno schermo con freccia) nella barra '+
-    'degli indirizzi, oppure menu <b>⋮ → Installa Carbur</b>.</div>'+
-    '<div class="ov-sec">Su Android puoi aggiungere Carbur alla schermata '+
-    'Home e usarla come una vera app.</div>';
-
-  btn.addEventListener('click',function(){
-    var p=plat();
-    osl.textContent = p==='android'?'su Android' : 'sul computer';
-    body.innerHTML = p==='android'?androidSteps : desktopSteps;
-    modal.style.display='flex';
-    var andBtn=document.getElementById('andGo');
-    if(andBtn){
-      andBtn.addEventListener('click',async function(){
-        if(deferred){
-          deferred.prompt();
-          await deferred.userChoice;
-          deferred=null;
-          modal.style.display='none';
-        } else {
-          andBtn.textContent='Usa il menu ⋮ di Chrome → "Installa app"';
-          andBtn.disabled=true;
-        }
-      });
-    }
-  });
-  $('#instClose').addEventListener('click',function(){ modal.style.display='none'; });
-  modal.addEventListener('click',function(e){
-    if(e.target===modal) modal.style.display='none';
-  });
-})();
 </script>
 </body>
 </html>
