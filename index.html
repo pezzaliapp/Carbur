@@ -316,37 +316,54 @@ function askGeo(){
   }
   $('#geo').disabled=true;
   setLive('cerco posizione…');
-  loading('Individuo la tua posizione…<br><small>se Safari chiede il permesso, tocca "Consenti"</small>');
+  loading('Individuo la tua posizione…<br><small>se appare la richiesta del permesso, tocca "Consenti"</small>');
 
-  // Safari iOS a volte non chiama né success né error: timeout di sicurezza
   var done=false;
-  var watchdog=setTimeout(function(){
-    if(done) return;
-    done=true;
-    $('#geo').disabled=false;
-    setLive('posizione bloccata');
-    view.innerHTML=geoHelp('Safari non ha risposto alla richiesta di posizione');
-  }, 15000);
 
+  function ok(p){
+    if(done) return; done=true;
+    pos={lat:p.coords.latitude,lon:p.coords.longitude};
+    setLive('posizione ok'); loadData();
+  }
+  function fail(msg){
+    if(done) return; done=true;
+    $('#geo').disabled=false;
+    setLive('posizione non disponibile');
+    view.innerHTML=geoHelp(msg);
+  }
+  function msgFor(e){
+    if(e && e.code===1) return 'Permesso di localizzazione negato';
+    if(e && e.code===2) return 'Posizione non disponibile in questo momento';
+    if(e && e.code===3) return 'Tempo scaduto nel rilevare la posizione';
+    return 'Non riesco ad accedere alla posizione';
+  }
+
+  // TENTATIVO 1: nessuna opzione passata.
+  // Safari iOS è noto per fallire all'istante se gli si passano
+  // enableHighAccuracy/timeout; senza opzioni funziona come gli altri browser.
   navigator.geolocation.getCurrentPosition(
-    function(p){
-      if(done) return; done=true; clearTimeout(watchdog);
-      pos={lat:p.coords.latitude,lon:p.coords.longitude};
-      setLive('posizione ok'); loadData();
-    },
-    function(e){
-      if(done) return; done=true; clearTimeout(watchdog);
-      $('#geo').disabled=false;
-      setLive('posizione non disponibile');
-      var msg;
-      if(e.code===1) msg='Permesso di localizzazione negato';
-      else if(e.code===2) msg='Posizione non disponibile in questo momento';
-      else if(e.code===3) msg='Tempo scaduto nel rilevare la posizione';
-      else msg='Non riesco ad accedere alla posizione';
-      view.innerHTML=geoHelp(msg);
-    },
-    {enableHighAccuracy:true, timeout:14000, maximumAge:0}
+    ok,
+    function(e1){
+      if(done) return;
+      // Se l'utente ha negato il permesso (code 1) è inutile insistere.
+      if(e1 && e1.code===1){ fail(msgFor(e1)); return; }
+      // TENTATIVO 2: ritento con alta precisione (utile su Android/desktop
+      // e in alcuni casi sblocca anche Safari su connessioni lente).
+      navigator.geolocation.getCurrentPosition(
+        ok,
+        function(e2){ fail(msgFor(e2)); },
+        {enableHighAccuracy:true, timeout:12000, maximumAge:0}
+      );
+    }
+    // nota: nessun terzo argomento qui — è il punto chiave per Safari iOS
   );
+
+  // Rete di sicurezza: se Safari non chiama MAI né ok né errore
+  // (bug documentato di WKWebView), dopo 20s mostriamo comunque la guida.
+  setTimeout(function(){
+    if(done) return;
+    fail('Safari non ha risposto alla richiesta di posizione');
+  }, 20000);
 }
 
 $('#geo').addEventListener('click', askGeo);
