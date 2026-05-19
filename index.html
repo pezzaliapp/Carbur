@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  Carbur — prezzi carburanti vicino a te
+  © 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati
+  Dati: Open Data MIMIT (licenza IODL 2.0)
+-->
 <html lang="it">
 <head>
 <meta charset="UTF-8">
@@ -124,9 +129,76 @@
     background:var(--ink);color:#000;border:none;border-radius:999px;padding:13px 24px;
     font-family:ui-monospace,monospace;font-weight:700;font-size:13px;cursor:pointer;
     box-shadow:0 10px 30px -8px rgba(0,0,0,.6);display:none;z-index:50}
+  .ov{position:fixed;inset:0;background:rgba(6,9,14,.97);z-index:200;
+    display:flex;align-items:center;justify-content:center;padding:22px;
+    backdrop-filter:blur(6px);overflow-y:auto}
+  .ov-card{max-width:540px;width:100%;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--r);padding:26px 24px;margin:auto}
+  .ov-card h2{font-size:24px;margin-bottom:4px}
+  .ov-card h2 b{color:var(--gas)}
+  .ov-sub{font-family:ui-monospace,monospace;font-size:11px;color:var(--fade);
+    letter-spacing:2px;text-transform:uppercase;margin-bottom:18px}
+  .ov-sec{margin:14px 0;font-size:14px;line-height:1.65;color:var(--dim)}
+  .ov-sec b{color:var(--ink)}
+  .ov-sec .t{font-family:ui-monospace,monospace;font-size:11px;color:var(--gas);
+    text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px}
+  .ov-chk{display:flex;align-items:flex-start;gap:11px;margin:20px 0 18px;
+    background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px;
+    cursor:pointer;user-select:none}
+  .ov-chk input{width:20px;height:20px;flex:0 0 auto;margin-top:1px;accent-color:var(--gas);cursor:pointer}
+  .ov-chk span{font-size:14px;line-height:1.5}
+  .ov-btn{width:100%;background:var(--gas);color:#000;border:none;border-radius:12px;
+    padding:15px;font-family:ui-monospace,monospace;font-weight:700;font-size:15px;
+    cursor:pointer;transition:.18s}
+  .ov-btn:disabled{opacity:.35;cursor:not-allowed}
+  .ov-note{font-family:ui-monospace,monospace;font-size:10px;color:var(--fade);
+    text-align:center;margin-top:14px;line-height:1.7}
+  .step{display:flex;gap:13px;align-items:flex-start;margin:15px 0;font-size:15px;line-height:1.5}
+  .step .n{flex:0 0 28px;height:28px;background:var(--gas);color:#000;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;
+    font-weight:700;font-size:14px}
+  .ov-x{background:none;border:1px solid var(--line);color:var(--dim);border-radius:10px;
+    padding:11px 18px;font-family:ui-monospace,monospace;font-size:13px;cursor:pointer;
+    width:100%;margin-top:10px}
 </style>
 </head>
 <body>
+
+<div class="ov" id="disclaimer">
+  <div class="ov-card">
+    <h2>Carbur<b>.</b></h2>
+    <div class="ov-sub">prima di iniziare</div>
+
+    <div class="ov-sec">
+      <span class="t">Privacy</span>
+      La tua posizione viene usata <b>solo sul tuo dispositivo</b> per trovare i
+      distributori vicini. Niente server, niente tracciamento, niente account.
+    </div>
+    <div class="ov-sec">
+      <span class="t">Uso consigliato</span>
+      Su <b>iPhone</b> apri Carbur con <b>Chrome</b>: su Safari iOS la posizione
+      automatica può non funzionare (limitazione di Apple). Prezzi da Open Data
+      MIMIT, indicativi — <b>verifica sempre alla pompa</b>.
+    </div>
+
+    <label class="ov-chk" for="agree">
+      <input type="checkbox" id="agree">
+      <span>Ho letto e accetto.</span>
+    </label>
+    <button class="ov-btn" id="enterBtn" disabled>Entra in Carbur</button>
+    <div class="ov-note">Open Data MIMIT · Lic. IODL 2.0 · nessun dato personale raccolto<br>© 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati</div>
+  </div>
+</div>
+
+<div class="ov" id="installModal" style="display:none">
+  <div class="ov-card">
+    <h2>📲 Installa Carbur</h2>
+    <div class="ov-sub" id="instOS">sul tuo dispositivo</div>
+    <div id="instBody"></div>
+    <button class="ov-x" id="instClose">Chiudi</button>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <div class="logo">Carbur<b>.</b><span>prezzi · vicino a te</span></div>
@@ -183,10 +255,11 @@
 
   <footer>
     DATI: OPEN DATA MIMIT · LIC. IODL 2.0<br>
-    prezzi aggiornati ~giornalmente · separatore pipe (dal 10/02/2026)
+    prezzi aggiornati ~giornalmente · separatore pipe (dal 10/02/2026)<br>
+    © 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati
   </footer>
 </div>
-<button class="install" id="install">⤓ Installa app</button>
+<button class="install" id="install">📲 Installa app</button>
 
 <script>
 const FUELS={benzina:'Benzina',gasolio:'Gasolio',gpl:'GPL',metano:'Metano'};
@@ -559,18 +632,95 @@ function fuelPrice(s,f){
 
 function esc(s){return (s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
 
-// ---- PWA ----
-let deferred;
-window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault(); deferred=e; $('#install').style.display='block';
-});
-$('#install').addEventListener('click',async()=>{
-  if(!deferred)return; deferred.prompt(); await deferred.userChoice;
-  deferred=null; $('#install').style.display='none';
+// ---- Disclaimer gate ----
+(function(){
+  var KEY='carbur_disclaimer_ok';
+  var ov=$('#disclaimer'), chk=$('#agree'), btn=$('#enterBtn');
+  var seen=false;
+  try{ seen = sessionStorage.getItem(KEY)==='1'; }catch(e){}
+  // sessionStorage può essere bloccato in private mode: fallback variabile
+  if(seen){ ov.style.display='none'; }
+  chk.addEventListener('change',function(){ btn.disabled=!chk.checked; });
+  btn.addEventListener('click',function(){
+    if(!chk.checked) return;
+    try{ sessionStorage.setItem(KEY,'1'); }catch(e){}
+    ov.style.display='none';
+  });
+})();
+
+// ---- rilevamento piattaforma ----
+function plat(){
+  var ua=navigator.userAgent||'';
+  if(/iPad|iPhone|iPod/.test(ua) || (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))
+    return 'ios';
+  if(/Android/.test(ua)) return 'android';
+  return 'desktop';
+}
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone===true;
+}
+
+// ---- Installa app ----
+let deferred=null;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault(); deferred=e;
 });
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').catch(function(){});
 }
+
+(function(){
+  var btn=$('#install'), modal=$('#installModal'),
+      body=$('#instBody'), osl=$('#instOS');
+  // già installata: nascondi il pulsante
+  if(isStandalone()){ btn.style.display='none'; return; }
+
+  var p0=plat();
+  // su iPhone l'installazione è macchinosa: niente pulsante, niente istruzioni
+  if(p0==='ios'){ btn.style.display='none'; return; }
+  btn.style.display='block';
+
+  var androidSteps=
+    '<div class="ov-sec">Tocca il pulsante qui sotto: comparirà la richiesta '+
+    'di installazione di Android.</div>'+
+    '<button class="ov-btn" id="andGo">Aggiungi alla schermata Home</button>'+
+    '<div class="ov-sec" style="margin-top:16px">Se non compare nulla: apri il '+
+    'menu <b>⋮</b> di Chrome in alto a destra e scegli '+
+    '<b>"Installa app"</b> o <b>"Aggiungi a schermata Home"</b>.</div>';
+
+  var desktopSteps=
+    '<div class="ov-sec">Sul computer puoi installarla da Chrome o Edge: '+
+    'cerca l\'icona <b>installa</b> (uno schermo con freccia) nella barra '+
+    'degli indirizzi, oppure menu <b>⋮ → Installa Carbur</b>.</div>'+
+    '<div class="ov-sec">Su Android puoi aggiungere Carbur alla schermata '+
+    'Home e usarla come una vera app.</div>';
+
+  btn.addEventListener('click',function(){
+    var p=plat();
+    osl.textContent = p==='android'?'su Android' : 'sul computer';
+    body.innerHTML = p==='android'?androidSteps : desktopSteps;
+    modal.style.display='flex';
+    var andBtn=document.getElementById('andGo');
+    if(andBtn){
+      andBtn.addEventListener('click',async function(){
+        if(deferred){
+          deferred.prompt();
+          await deferred.userChoice;
+          deferred=null;
+          modal.style.display='none';
+        } else {
+          andBtn.textContent='Usa il menu ⋮ di Chrome → "Installa app"';
+          andBtn.disabled=true;
+        }
+      });
+    }
+  });
+  $('#instClose').addEventListener('click',function(){ modal.style.display='none'; });
+  modal.addEventListener('click',function(e){
+    if(e.target===modal) modal.style.display='none';
+  });
+})();
 </script>
 </body>
 </html>

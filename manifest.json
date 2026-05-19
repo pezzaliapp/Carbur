@@ -1,7 +1,9 @@
 {
   "name": "Carbur — prezzi carburanti vicino a te",
   "short_name": "Carbur",
-  "description": "Trova i distributori di carburante più economici vicino a te. Dati open data MIMIT.",
+  "description": "Trova i distributori di carburante più economici vicino a te. Dati open data MIMIT. © 2026 Alessandro Pezzali · PezzaliAPP.",
+  "author": "Alessandro Pezzali — PezzaliAPP",
+  "copyright": "© 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
