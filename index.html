@@ -190,9 +190,11 @@
 
 <script>
 const FUELS={benzina:'Benzina',gasolio:'Gasolio',gpl:'GPL',metano:'Metano'};
-const ANAG='https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv';
-const PREZ='https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv';
-const PROXY='https://corsproxy.io/?url=';
+// Backend proxy MIMIT (Cloudflare Worker). Verrà sostituito automaticamente
+// dallo script di deploy con l'URL reale del Worker dopo la pubblicazione.
+const API='https://carbur-mimit-proxy.pezzalialessandro.workers.dev';
+const ANAG=API+'/anagrafica';
+const PREZ=API+'/prezzi';
 let pos=null, DB=null, active=new Set(['benzina','gasolio']);
 let curView='list', map=null, layer=null, lastArr=[];
 let mode='all', flagSel='__all';
@@ -316,35 +318,44 @@ function dist(la1,lo1,la2,lo2){
   return R*2*Math.asin(Math.sqrt(a));
 }
 
-// ---- fetch with fallbacks ----
+// ---- fetch dal backend proxy MIMIT (Cloudflare Worker) ----
 async function grab(url){
-  try{
-    const r=await fetch(url,{cache:'no-store'});
-    if(r.ok) return await r.text();
-    throw 0;
-  }catch(_){
-    const r=await fetch(PROXY+encodeURIComponent(url),{cache:'no-store'});
-    if(!r.ok) throw new Error('fetch failed');
-    return await r.text();
-  }
+  const r=await fetch(url,{cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const t=await r.text();
+  if(!t || t.length<100) throw new Error('risposta vuota');
+  return t;
 }
 
 async function loadData(){
-  loading('Scarico i prezzi dal MIMIT…<br><small>file open data, può richiedere qualche secondo</small>');
+  if(API.indexOf('__CARBUR')===0){
+    srcEl.className='src warn';
+    srcEl.textContent='⚠ Backend non configurato';
+    view.innerHTML='<div class="status"><div class="big">⚙</div>'+
+      'Il backend MIMIT non è ancora configurato.<br>'+
+      '<small>Esegui lo script di deploy del Worker (vedi ISTRUZIONI-CLAUDE-CODE.md).</small></div>';
+    $('#geo').disabled=false; return;
+  }
+  loading('Scarico i prezzi reali dal MIMIT…<br><small>via backend, la prima volta può richiedere qualche secondo</small>');
   try{
     const [aTxt,pTxt]=await Promise.all([grab(ANAG),grab(PREZ)]);
     DB=parse(aTxt,pTxt);
+    if(!DB.size) throw new Error('nessun impianto valido nei dati');
     srcEl.className='src';
-    srcEl.textContent='● fonte: open data MIMIT — '+DB.size+' impianti caricati';
+    srcEl.textContent='● fonte: open data MIMIT (ufficiale) — '+DB.size+' impianti';
+    setLive('dati reali ok');
     buildFlags();
     render();
   }catch(err){
-    DB=demo();
+    DB=null;
     srcEl.className='src warn';
-    srcEl.textContent='⚠ MIMIT non raggiungibile dal browser — modalità DEMO (prezzi simulati)';
-    setLive('demo');
-    buildFlags();
-    render();
+    srcEl.textContent='⚠ Prezzi MIMIT momentaneamente non disponibili';
+    setLive('errore dati');
+    view.innerHTML='<div class="status"><div class="big">⚠</div>'+
+      'Non riesco a recuperare i prezzi reali dal MIMIT in questo momento.<br>'+
+      '<small>'+esc(String(err.message||err))+' — riprova tra poco.</small><br><br>'+
+      '<button class="geo" onclick="loadData()">↻ Riprova</button></div>';
+    $('#geo').disabled=false;
   }
 }
 
@@ -484,29 +495,6 @@ function fuelPrice(s,f){
 }
 
 function esc(s){return (s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
-
-// ---- demo fallback ----
-function demo(){
-  if(!pos)pos={lat:45.4642,lon:9.19};
-  const m=new Map(); const bands=['Eni','Q8','IP','Esso','Tamoil','No logo','Repsol'];
-  for(let i=0;i<60;i++){
-    const a=Math.random()*6.28, r=Math.random()*0.18;
-    const base=1.72+Math.random()*0.22;
-    const bz=+base.toFixed(3), gs=+(base-0.05+Math.random()*.03).toFixed(3);
-    const pr={
-      benzina:{s:{price:bz,dt:'demo'}, v:{price:+(bz+0.12).toFixed(3),dt:'demo'}},
-      gasolio:{s:{price:gs,dt:'demo'}, v:{price:+(gs+0.11).toFixed(3),dt:'demo'}}
-    };
-    if(Math.random()>.5)pr.gpl={s:{price:+(0.71+Math.random()*.08).toFixed(3),dt:'demo'}};
-    if(Math.random()>.7)pr.metano={s:{price:+(1.4+Math.random()*.2).toFixed(3),dt:'demo'}};
-    m.set('d'+i,{id:'d'+i,name:bands[i%bands.length]+' Stazione '+(i+1),
-      flag:bands[i%bands.length],addr:'Via Esempio '+(i*3+1),
-      city:'Comune',prov:'XX',
-      lat:pos.lat+Math.sin(a)*r, lon:pos.lon+Math.cos(a)*r/0.7,
-      prices:pr});
-  }
-  return m;
-}
 
 // ---- PWA ----
 let deferred;

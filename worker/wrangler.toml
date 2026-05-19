@@ -1,0 +1,7 @@
+name = "carbur-mimit-proxy"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+# Il Worker sarà raggiungibile su:
+#   https://carbur-mimit-proxy.<tuo-subdominio>.workers.dev
+# L'URL esatto viene stampato da wrangler al primo deploy.
