@@ -199,6 +199,42 @@
   </div>
 </div>
 
+<div class="ov" id="manifesto" style="display:none">
+  <div class="ov-card">
+    <h2>Il pieno come problema gnoseologico</h2>
+    <div class="ov-sub">manifesto · carbur</div>
+    <div class="ov-sec">
+      Esiste una forma di sapere che nessuna enciclopedia ha mai catalogato:
+      sapere dove costano meno la benzina e il gasolio. Per decenni l'automobilista
+      medio ha affrontato la pompa come gli antichi affrontavano gli aruspici,
+      interrogando il volo degli uccelli o l'insegna luminosa. Ha scelto il
+      distributore per abitudine, vicinanza o per una vaga fede mal riposta, per
+      poi scoprire, trecento metri dopo, che lo stesso litro costava sei centesimi
+      in meno. L'umiliazione, si sa, è democratica e non fa distinzioni.
+    </div>
+    <div class="ov-sec">
+      Carbur risolve questo problema che credevamo metafisico e che era invece,
+      banalmente, di dati. Attinge ai prezzi che il Ministero delle Imprese e del
+      Made in Italy pubblica quotidianamente — benzina, gasolio, GPL, metano,
+      l'intera liturgia del rifornimento — e li ordina dal più mite al più feroce,
+      intorno a te, su lista e su mappa.
+    </div>
+    <div class="ov-sec">
+      Nessun miracolo, nessuna pubblicità e nessun tracciamento: la posizione
+      resta sul dispositivo e nessun dato personale viene raccolto. Gratuita,
+      funziona da qualsiasi browser — anche se su iPhone se ne consiglia l'uso
+      con Chrome, per ragioni che il Ministero, Apple e la filosofia del software
+      non hanno ancora del tutto chiarito tra loro.
+    </div>
+    <div class="ov-sec">
+      Non promette la felicità, ma una piccola forma di saggezza applicata.
+      Perché sapere dove costa meno non dovrebbe essere un atto di fede.
+    </div>
+    <button class="ov-btn" id="manifClose">Continua</button>
+    <div class="ov-note">© 2026 Alessandro Pezzali · PezzaliAPP</div>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <div class="logo">Carbur<b>.</b><span>prezzi · vicino a te</span></div>
@@ -256,7 +292,8 @@
   <footer>
     DATI: OPEN DATA MIMIT · LIC. IODL 2.0<br>
     prezzi aggiornati ~giornalmente · separatore pipe (dal 10/02/2026)<br>
-    © 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati
+    © 2026 Alessandro Pezzali · PezzaliAPP · Tutti i diritti riservati<br>
+    <a href="#" id="manifOpen" style="color:var(--gas);text-decoration:none">↳ leggi il manifesto</a>
   </footer>
 </div>
 <button class="install" id="install">📲 Installa app</button>
@@ -632,19 +669,36 @@ function fuelPrice(s,f){
 
 function esc(s){return (s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
 
-// ---- Disclaimer gate ----
+// ---- Disclaimer gate + Manifesto ----
 (function(){
   var KEY='carbur_disclaimer_ok';
+  var MKEY='carbur_manifesto_seen';
   var ov=$('#disclaimer'), chk=$('#agree'), btn=$('#enterBtn');
-  var seen=false;
-  try{ seen = sessionStorage.getItem(KEY)==='1'; }catch(e){}
-  // sessionStorage può essere bloccato in private mode: fallback variabile
-  if(seen){ ov.style.display='none'; }
+  var man=$('#manifesto'), manClose=$('#manifClose'), manOpen=$('#manifOpen');
+
+  function get(k){ try{ return sessionStorage.getItem(k)==='1'; }catch(e){ return false; } }
+  function set(k){ try{ sessionStorage.setItem(k,'1'); }catch(e){} }
+
+  function showManifesto(){ man.style.display='flex'; }
+  function hideManifesto(){ man.style.display='none'; set(MKEY); }
+
+  // manifesto rileggibile dal footer (sempre)
+  manOpen.addEventListener('click',function(e){ e.preventDefault(); showManifesto(); });
+  manClose.addEventListener('click',hideManifesto);
+  man.addEventListener('click',function(e){ if(e.target===man) hideManifesto(); });
+
+  var seen=get(KEY);
+  if(seen){
+    ov.style.display='none';
+  }
   chk.addEventListener('change',function(){ btn.disabled=!chk.checked; });
   btn.addEventListener('click',function(){
     if(!chk.checked) return;
-    try{ sessionStorage.setItem(KEY,'1'); }catch(e){}
+    set(KEY);
     ov.style.display='none';
+    // manifesto: solo la primissima volta, subito dopo aver accettato.
+    // Saltabile (pulsante Continua), poi mai più in automatico.
+    if(!get(MKEY)) showManifesto();
   });
 })();
 
