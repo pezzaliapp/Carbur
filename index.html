@@ -290,8 +290,13 @@ const FUELS={benzina:'Benzina',gasolio:'Gasolio',gpl:'GPL',metano:'Metano'};
 // Backend proxy MIMIT (Cloudflare Worker). Verrà sostituito automaticamente
 // dallo script di deploy con l'URL reale del Worker dopo la pubblicazione.
 const API='https://carbur-mimit-proxy.pezzalialessandro.workers.dev';
-const ANAG=API+'/anagrafica';
-const PREZ=API+'/prezzi';
+// Fonte principale: CSV MIMIT copiati ogni mattina da una GitHub Action nel ramo "data".
+// Il Worker resta come riserva (il MIMIT rifiuta spesso i server Cloudflare: errore 522).
+const GH='https://raw.githubusercontent.com/pezzaliapp/Carbur/data';
+const SOURCES=[
+  {name:'GitHub',  anag:GH+'/anagrafica.csv', prez:GH+'/prezzi.csv'},
+  {name:'Worker',  anag:API+'/anagrafica',    prez:API+'/prezzi'},
+];
 let pos=null, DB=null, DATA_DATE='', active=new Set(['benzina','gasolio']);
 let curView='list', map=null, layer=null, lastArr=[];
 let mode='all', flagSel='__all';
@@ -484,11 +489,12 @@ async function grab(url){
   if(!r.ok) throw new Error('HTTP '+r.status);
   const t=await r.text();
   if(!t || t.length<100) throw new Error('risposta vuota');
+  if(t.split(/\r?\n/,2)[1]?.indexOf('|')<0) throw new Error('formato inatteso');
   return t;
 }
 
 async function loadData(){
-  if(API.indexOf('__CARBUR')===0){
+  if(false){
     srcEl.className='src warn';
     srcEl.textContent='⚠ Backend non configurato';
     view.innerHTML='<div class="status"><div class="big">⚙</div>'+
@@ -498,7 +504,12 @@ async function loadData(){
   }
   loading('Scarico i prezzi reali dal MIMIT…<br><small>via backend, la prima volta può richiedere qualche secondo</small>');
   try{
-    const [aTxt,pTxt]=await Promise.all([grab(ANAG),grab(PREZ)]);
+    let aTxt,pTxt,lastErr;
+    for(const src of SOURCES){
+      try{ [aTxt,pTxt]=await Promise.all([grab(src.anag),grab(src.prez)]); break; }
+      catch(e){ lastErr=new Error(src.name+': '+(e.message||e)); aTxt=pTxt=null; }
+    }
+    if(!pTxt) throw lastErr||new Error('nessuna fonte disponibile');
     DB=parse(aTxt,pTxt);
     if(!DB.size) throw new Error('nessun impianto valido nei dati');
     srcEl.className='src';
