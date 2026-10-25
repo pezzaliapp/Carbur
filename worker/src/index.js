@@ -16,8 +16,9 @@ const SRC = {
   prezzi:     'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv',
 };
 
-// I file MIMIT cambiano ~1 volta al giorno: cache 3h è un buon compromesso
-const CACHE_SECONDS = 60 * 60 * 3;
+// Il MIMIT rigenera i CSV ogni mattina (estrazione delle 8): cache breve,
+// altrimenti dopo le 8 si continuano a servire i prezzi del giorno prima.
+const CACHE_SECONDS = 60 * 30;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,14 +55,16 @@ export default {
     // Cache edge di Cloudflare: il CSV viene scaricato dal MIMIT
     // al massimo una volta ogni CACHE_SECONDS, non a ogni utente.
     const cache = caches.default;
-    const cacheKey = new Request(url.toString(), request);
+    // chiave senza query string: il ?t= anti-cache del client non deve bucare la cache edge
+    const cacheKey = new Request(url.origin + path, { method: 'GET' });
     let hit = await cache.match(cacheKey);
     if (hit) return withCors(hit);
 
     let upstream;
     try {
-      upstream = await fetch(SRC[key], {
-        cf: { cacheTtl: CACHE_SECONDS, cacheEverything: true },
+      // niente cacheEverything lato fetch: si sommava alla cache edge (fino a 2x la durata)
+      upstream = await fetch(SRC[key] + '?t=' + Math.floor(Date.now() / (CACHE_SECONDS * 1000)), {
+        cf: { cacheTtl: 0 },
         headers: { 'User-Agent': 'Carbur-PWA/1.0 (+open-data MIMIT)' },
       });
     } catch (e) {

@@ -292,7 +292,7 @@ const FUELS={benzina:'Benzina',gasolio:'Gasolio',gpl:'GPL',metano:'Metano'};
 const API='https://carbur-mimit-proxy.pezzalialessandro.workers.dev';
 const ANAG=API+'/anagrafica';
 const PREZ=API+'/prezzi';
-let pos=null, DB=null, active=new Set(['benzina','gasolio']);
+let pos=null, DB=null, DATA_DATE='', active=new Set(['benzina','gasolio']);
 let curView='list', map=null, layer=null, lastArr=[];
 let mode='all', flagSel='__all';
 
@@ -480,7 +480,7 @@ function dist(la1,lo1,la2,lo2){
 
 // ---- fetch dal backend proxy MIMIT (Cloudflare Worker) ----
 async function grab(url){
-  const r=await fetch(url,{cache:'no-store'});
+  const r=await fetch(url+(url.includes('?')?'&':'?')+'t='+Math.floor(Date.now()/6e5),{cache:'no-store'});
   if(!r.ok) throw new Error('HTTP '+r.status);
   const t=await r.text();
   if(!t || t.length<100) throw new Error('risposta vuota');
@@ -503,6 +503,7 @@ async function loadData(){
     if(!DB.size) throw new Error('nessun impianto valido nei dati');
     srcEl.className='src';
     srcEl.textContent='● fonte: open data MIMIT (ufficiale) — '+DB.size+' impianti';
+    $('#dataline').textContent=DATA_DATE||'';
     setLive('dati reali ok');
     buildFlags();
     render();
@@ -520,37 +521,67 @@ async function loadData(){
 }
 
 // ---- MIMIT pipe parser ----
+// prezzi più vecchi di così vengono ignorati (impianti che non comunicano più)
+const MAX_AGE_DAYS=30;
+// "dd/mm/yyyy hh:mm:ss" oppure ISO "yyyy-mm-dd hh:mm:ss" -> Date
+function parseDt(t){
+  t=(t||'').trim(); let m;
+  if((m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/)))
+    return new Date(+m[3],m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  if((m=t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)))
+    return new Date(+m[1],m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  return null;
+}
+function fmtDt(d){
+  if(!d)return '';
+  const p=n=>String(n).padStart(2,'0');
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+// solo i carburanti base: le varianti premium (Blue Diesel, Benzina Plus, HiQ…)
+// non devono essere mostrate come "il prezzo del gasolio/benzina"
+function fuelKey(desc){
+  const d=(desc||'').toLowerCase().replace(/\s+/g,' ').trim();
+  if(d==='benzina'||d==='benzina senza piombo'||d==='super senza piombo')return 'benzina';
+  if(d==='gasolio'||d==='diesel'||d==='gasolio autotrazione')return 'gasolio';
+  if(d==='gpl')return 'gpl';
+  if(d==='metano'||d==='gnc')return 'metano';
+  return null;
+}
 function parse(aTxt,pTxt){
   const map=new Map();
+  // riga 1 = "Estrazione del ...", riga 2 = intestazione
+  DATA_DATE=(pTxt.split(/\r?\n/,1)[0]||'').replace(/^﻿/,'').trim();
   const aLines=aTxt.split(/\r?\n/);
   // anagrafica: idImpianto|Gestore|Bandiera|TipoImpianto|Nome|Indirizzo|Comune|Provincia|Latitudine|Longitudine
   for(let i=2;i<aLines.length;i++){
     const c=aLines[i].split('|'); if(c.length<10)continue;
-    const lat=parseFloat(c[8]), lon=parseFloat(c[9]);
+    const lat=parseFloat(String(c[8]).replace(',','.')), lon=parseFloat(String(c[9]).replace(',','.'));
     if(!lat||!lon||lat<35||lat>48)continue;
-    map.set(c[0],{id:c[0],name:(c[4]||c[1]||'Distributore').trim(),
+    map.set(c[0].trim(),{id:c[0].trim(),name:(c[4]||c[1]||'Distributore').trim(),
       flag:(c[2]||'').trim(),addr:(c[5]||'').trim(),
       city:(c[6]||'').trim(),prov:(c[7]||'').trim(),
       lat,lon,prices:{}});
   }
+  const now=Date.now(), maxAge=MAX_AGE_DAYS*864e5;
   const pLines=pTxt.split(/\r?\n/);
   // prezzi: idImpianto|descCarburante|prezzo|isSelf|dtComu
   for(let i=2;i<pLines.length;i++){
     const c=pLines[i].split('|'); if(c.length<5)continue;
-    const st=map.get(c[0]); if(!st)continue;
-    const d=(c[1]||'').toLowerCase();
-    let k=null;
-    if(d.includes('benzina'))k='benzina';
-    else if(d.includes('gasolio')||d.includes('diesel'))k='gasolio';
-    else if(d.includes('gpl'))k='gpl';
-    else if(d.includes('metano'))k='metano';
-    if(!k)continue;
-    const pr=parseFloat(c[2]); if(!pr||pr<=0)continue;
-    const self=c[3]==='1';
+    const st=map.get(c[0].trim()); if(!st)continue;
+    const k=fuelKey(c[1]); if(!k)continue;
+    const pr=parseFloat(String(c[2]).replace(',','.'));
+    if(!pr||pr<0.3||pr>5)continue;                 // valori palesemente errati
+    const when=parseDt(c[4]);
+    if(when&&now-when.getTime()>maxAge)continue;   // prezzo non più aggiornato
+    const self=c[3].trim()==='1';
     const slot=self?'s':'v';
     if(!st.prices[k])st.prices[k]={};
     const cur=st.prices[k][slot];
-    if(!cur||pr<cur.price){ st.prices[k][slot]={price:pr,dt:c[4]||''}; }
+    const t=when?when.getTime():0;
+    // se lo stesso carburante compare più volte vince la comunicazione più recente
+    if(!cur||t>cur.t||(t===cur.t&&pr<cur.price)){
+      st.prices[k][slot]={price:pr,dt:when?fmtDt(when):(c[4]||'').trim(),t};
+    }
   }
   return map;
 }
